@@ -1,0 +1,25 @@
+name: Relatorio Diario GMBC
+
+on:
+  schedule:
+    - cron: '50 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependências
+        run: pip install pandas openpyxl
+      - name: Enviar relatório
+        env:
+          BOT_TOKEN:       ${{ secrets.BOT_TOKEN }}
+          CHAT_ID:         ${{ secrets.CHAT_ID }}
+          GOOGLE_DRIVE_ID: ${{ secrets.GOOGLE_DRIVE_ID }}
+        run: python enviar_relatorio.py
