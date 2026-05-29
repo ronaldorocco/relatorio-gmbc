@@ -310,45 +310,43 @@ def busca_universal(records, query):
     # Descobre em quais campos houve match para exibir contexto
     campos_encontrados = [c for c in campos if any(campo_match(r.get(c,'')) for r in matches)]
 
-    tipos   = Counter(r['tipo']    for r in matches if r['tipo']).most_common(5)
-    bairros = Counter(r['bairro']  for r in matches if r['bairro']).most_common(5)
-    turnos  = Counter(r['turno']   for r in matches if r['turno']).most_common()
-    ruas    = Counter(r['endereco'] for r in matches if r['endereco'] and r['endereco'] != 'nan').most_common(5)
-    dias    = Counter(r['dia']     for r in matches if r['dia']).most_common()
-    meses   = Counter(r['data'][5:7] for r in matches if r.get('data') and len(r['data'])>=7).most_common()
-    datas   = sorted(set(r['data'] for r in matches))
-
     MES_NOME = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril','05':'Maio',
                 '06':'Junho','07':'Julho','08':'Agosto','09':'Setembro','10':'Outubro',
                 '11':'Novembro','12':'Dezembro'}
 
-    # Linha de resumo
-    if total_item > 0 and total_item < total:
-        resumo = f"*{total_item}* como item principal  |  *{total}* total (incl. descrições)"
-    else:
-        resumo = f"*{total}* ocorrência(s) encontrada(s)"
+    # Usa registros do item principal para estatísticas (igual ao dashboard)
+    base = matches_item if total_item > 0 else matches
+    total_base = len(base)
+
+    tipos   = Counter(r['tipo']    for r in base if r['tipo']).most_common(5)
+    bairros = Counter(r['bairro']  for r in base if r['bairro']).most_common(5)
+    turnos  = Counter(r['turno']   for r in base if r['turno']).most_common()
+    ruas    = Counter(r['endereco'] for r in base if r['endereco'] and r['endereco'] != 'nan').most_common(5)
+    dias    = Counter(r['dia']     for r in base if r['dia']).most_common()
+    meses   = Counter(r['data'][5:7] for r in base if r.get('data') and len(r['data'])>=7).most_common()
+    datas   = sorted(set(r['data'] for r in base))
 
     linhas = [
         f"🔍 *BUSCA: \"{query.upper()}\"*",
-        f"📊 {resumo}",
+        f"📊 *{total_base}* ocorrência(s) encontrada(s)",
         f"📅 Período: {datas[0][8:10]}/{datas[0][5:7]} — {datas[-1][8:10]}/{datas[-1][5:7]}",
     ]
 
     if tipos:
         linhas += ["", "*🔴 Tipificação:*"]
-        linhas += [f"  {i+1}. {t}: *{n}* ({pct(n,total)})" for i,(t,n) in enumerate(tipos)]
+        linhas += [f"  {i+1}. {t}: *{n}* ({pct(n,total_base)})" for i,(t,n) in enumerate(tipos)]
 
     if bairros:
         linhas += ["", "*📍 Bairros:*"]
-        linhas += [f"  {i+1}. {b}: *{n}* ({pct(n,total)})" for i,(b,n) in enumerate(bairros)]
+        linhas += [f"  {i+1}. {b}: *{n}* ({pct(n,total_base)})" for i,(b,n) in enumerate(bairros)]
 
     if turnos:
         linhas += ["", "*⏰ Turno:*"]
-        linhas += [f"  • {t}: *{n}* ({pct(n,total)})" for t,n in turnos]
+        linhas += [f"  • {t}: *{n}* ({pct(n,total_base)})" for t,n in turnos]
 
     if dias:
         linhas += ["", "*📆 Dia da semana:*"]
-        linhas += [f"  • {d}: *{n}* ({pct(n,total)})" for d,n in dias]
+        linhas += [f"  • {d}: *{n}* ({pct(n,total_base)})" for d,n in dias]
 
     if meses:
         linhas += ["", "*🗓 Mês:*"]
@@ -409,6 +407,21 @@ def processar(text, chat_id, records):
 
     if tl.startswith('/turno '):
         return send_message(chat_id, consultar_turno(records, t[7:]))
+
+    # Detecta automaticamente se é bairro, tipo ou turno conhecido
+    bairros_lista = sorted(set(r['bairro'] for r in records if r['bairro']))
+    for b in bairros_lista:
+        if tl == b.lower() or tl in b.lower().split() or b.lower() == tl:
+            return send_message(chat_id, consultar_bairro(records, t))
+
+    tipos_lista = sorted(set(r['tipo'] for r in records if r['tipo']))
+    for tp in tipos_lista:
+        if tl == tp.lower() or tl in tp.lower():
+            return send_message(chat_id, consultar_tipo(records, t))
+
+    turno_palavras = ['madrugada','manha','manhã','tarde','noite']
+    if tl in turno_palavras:
+        return send_message(chat_id, consultar_turno(records, t))
 
     # Busca universal em todos os campos
     return send_message(chat_id, busca_universal(records, t))
