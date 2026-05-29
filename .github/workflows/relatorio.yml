@@ -2,7 +2,7 @@ name: Relatorio Diario GMBC
 
 on:
   schedule:
-    - cron: '50 9 * * *'
+    - cron: '50 3 * * *'
   workflow_dispatch:
 
 jobs:
