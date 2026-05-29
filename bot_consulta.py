@@ -91,6 +91,13 @@ def norm_item(v):
     u_norm = sem_acento(u).upper()
     return ITEM_MAP.get(u, ITEM_MAP_NORMALIZED.get(u_norm, str(v).strip().title()))
 
+def clean_text_cell(v):
+    if not v or str(v).strip().upper() in ('','NAN'):
+        return ''
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v).strip()
+
 def calcular_turno(hora_val):
     try:
         h = hora_val.hour if hasattr(hora_val,'hour') else int(str(hora_val).strip().split(':')[0])
@@ -144,6 +151,7 @@ def carregar_dados():
     df['ENDERECO'] = df['ENDEREÇO'].fillna('').astype(str)
     df['ITEM_STR'] = df['ITEM'].apply(norm_item) if 'ITEM' in df.columns else ''
     df['MARCA_STR'] = df['MARCA_MODELO'].fillna('').astype(str).apply(lambda v: '' if v.strip().lower() in ('','nan') else v.strip()) if 'MARCA_MODELO' in df.columns else ''
+    df['IMEI_STR'] = df['IMEI'].apply(clean_text_cell) if 'IMEI' in df.columns else ''
     df['BO_STR'] = df['B.O.'].fillna('').astype(str)
 
     records = []
@@ -159,6 +167,7 @@ def carregar_dados():
             'hora':    r['HORA_STR'],
             'item':    r.get('ITEM_STR','') if 'ITEM_STR' in r else '',
             'marca':   r.get('MARCA_STR','') if 'MARCA_STR' in r else '',
+            'imei':    r.get('IMEI_STR','') if 'IMEI_STR' in r else '',
             'bo':      r['BO_STR'],
         })
     return records
@@ -308,9 +317,9 @@ def consultar_resumo(records):
     return '\n'.join(linhas)
 
 def busca_universal(records, query):
-    """Busca em todos os campos: bairro, tipo, item, marca, turno, logradouro, dia."""
+    """Busca em todos os campos: bairro, tipo, item, marca, IMEI, turno, logradouro, dia."""
     q = sem_acento(query.strip())
-    campos = ['bairro','tipo','item','marca','turno','endereco','dia','bo']
+    campos = ['bairro','tipo','item','marca','imei','turno','endereco','dia','bo']
 
     # Variações da busca: original, sem 's' final, sem 'es' final
     variacoes = {q}
@@ -332,7 +341,7 @@ def busca_universal(records, query):
     if not matches:
         return (
             f"Nenhuma ocorrência encontrada para *'{query}'*.\n\n"
-            "Tente: nome de bairro, tipo de crime, item (bicicleta, celular...), turno ou logradouro.\n"
+            "Tente: nome de bairro, tipo de crime, item (bicicleta, celular...), IMEI, turno ou logradouro.\n"
             "Digite /ajuda para ver todos os comandos."
         )
 
