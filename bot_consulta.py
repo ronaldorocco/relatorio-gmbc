@@ -12,7 +12,7 @@ Comandos disponíveis:
   /ajuda              → lista de comandos
 """
 
-import sys, json, math, warnings
+import sys, json, math, warnings, unicodedata
 from datetime import datetime, timezone, timedelta
 from collections import Counter
 import urllib.request, urllib.error
@@ -44,6 +44,27 @@ MES_PARA_NUM = {
     'NOVEMBRO':'11','DEZEMBRO':'12',
 }
 TIPO_MAP = {'FURTO':'Furto','ROUBO':'Roubo'}
+ITEM_MAP = {
+    'VEICULO':'Ve\u00edculo','VEILCULO':'Ve\u00edculo','VEICULO ':'Ve\u00edculo',
+    'CELULAR':'Celular','FIA\u00c7\u00c3O EL\u00c9TRICA':'Fia\u00e7\u00e3o El\u00e9trica',
+    'FIA\u00c7AO ELETRICA':'Fia\u00e7\u00e3o El\u00e9trica','FIA\u00c7\u00c3O ELETRICA':'Fia\u00e7\u00e3o El\u00e9trica',
+    'ELETRODOMESTICO':'Eletrodom\u00e9stico','COMBUSTIVEL':'Combust\u00edvel',
+    'JETSKI':'JetSki','ALUMINIO':'Alum\u00ednio','VESTUARIO':'Vestu\u00e1rio',
+    'PRODUTOS':'Produtos','REBOQUE':'Reboque','MERCADORIAS':'Mercadorias',
+    'OBJETOS':'Objetos','DINHEIRO':'Dinheiro','SCOOTER':'Scooter',
+    'BICICLETA':'Bicicleta','ELETR\u00d4NICO':'Eletr\u00f4nico','ELETRONICO':'Eletr\u00f4nico',
+    'MOTOCICLETA':'Motocicleta',
+}
+ITEM_MAP_NORMALIZED = {
+    'VEICULO':'Ve\u00edculo','VEILCULO':'Ve\u00edculo',
+    'CELULAR':'Celular','FIACAO ELETRICA':'Fia\u00e7\u00e3o El\u00e9trica',
+    'ELETRODOMESTICO':'Eletrodom\u00e9stico','COMBUSTIVEL':'Combust\u00edvel',
+    'JETSKI':'JetSki','ALUMINIO':'Alum\u00ednio','VESTUARIO':'Vestu\u00e1rio',
+    'PRODUTOS':'Produtos','REBOQUE':'Reboque','MERCADORIAS':'Mercadorias',
+    'OBJETOS':'Objetos','DINHEIRO':'Dinheiro','SCOOTER':'Scooter',
+    'BICICLETA':'Bicicleta','ELETRONICO':'Eletr\u00f4nico',
+    'MOTOCICLETA':'Motocicleta',
+}
 ORDEM_TURNO = ['Madrugada','Manhã','Tarde','Noite']
 
 
@@ -52,6 +73,10 @@ def norm(v, mapa):
     u = str(v).strip().upper()
     return mapa.get(u, str(v).strip().title())
 
+def sem_acento(v):
+    txt = unicodedata.normalize('NFKD', str(v).lower())
+    return ''.join(c for c in txt if not unicodedata.combining(c))
+
 def norm_tipo(v):
     if not v or str(v).strip().upper() in ('','NAN'): return ''
     v = str(v).strip().upper()
@@ -59,6 +84,12 @@ def norm_tipo(v):
     if 'TENTATIVA' in v and 'FURTO' in v: return 'Tentativa de Furto'
     if 'ARROMBAMENTO' in v: return 'Arrombamento'
     return TIPO_MAP.get(v, v.title())
+
+def norm_item(v):
+    if not v or str(v).strip().upper() in ('','NAN'): return ''
+    u = str(v).strip().upper()
+    u_norm = sem_acento(u).upper()
+    return ITEM_MAP.get(u, ITEM_MAP_NORMALIZED.get(u_norm, str(v).strip().title()))
 
 def calcular_turno(hora_val):
     try:
@@ -111,7 +142,7 @@ def carregar_dados():
     df['DATA_STR'] = df.apply(build_data, axis=1)
     df['HORA_STR'] = df['HORA'].apply(lambda x: x.strftime('%H:%M') if hasattr(x,'strftime') else str(x)[:5] if str(x).strip() not in ('','nan') else '')
     df['ENDERECO'] = df['ENDEREÇO'].fillna('').astype(str)
-    df['ITEM_STR'] = df['ITEM'].fillna('').astype(str).apply(lambda v: '' if v.strip().lower() in ('','nan') else v.strip().title()) if 'ITEM' in df.columns else ''
+    df['ITEM_STR'] = df['ITEM'].apply(norm_item) if 'ITEM' in df.columns else ''
     df['MARCA_STR'] = df['MARCA_MODELO'].fillna('').astype(str).apply(lambda v: '' if v.strip().lower() in ('','nan') else v.strip()) if 'MARCA_MODELO' in df.columns else ''
     df['BO_STR'] = df['B.O.'].fillna('').astype(str)
 
@@ -162,8 +193,8 @@ def pct(n, total):
 
 def consultar_bairro(records, query):
     bairros = sorted(set(r['bairro'] for r in records if r['bairro']))
-    q = query.strip().lower()
-    match = next((b for b in bairros if q in b.lower() or b.lower() in q), None)
+    q = sem_acento(query.strip())
+    match = next((b for b in bairros if q in sem_acento(b) or sem_acento(b) in q), None)
 
     if not match:
         lista = '\n'.join(f"• {b}" for b in bairros[:15])
@@ -198,8 +229,8 @@ def consultar_bairro(records, query):
 
 def consultar_tipo(records, query):
     tipos = sorted(set(r['tipo'] for r in records if r['tipo']))
-    q = query.strip().lower()
-    match = next((t for t in tipos if q in t.lower() or t.lower() in q), None)
+    q = sem_acento(query.strip())
+    match = next((t for t in tipos if q in sem_acento(t) or sem_acento(t) in q), None)
 
     if not match:
         lista = '\n'.join(f"• {t}" for t in tipos)
@@ -278,7 +309,7 @@ def consultar_resumo(records):
 
 def busca_universal(records, query):
     """Busca em todos os campos: bairro, tipo, item, marca, turno, logradouro, dia."""
-    q = query.strip().lower()
+    q = sem_acento(query.strip())
     campos = ['bairro','tipo','item','marca','turno','endereco','dia','bo']
 
     # Variações da busca: original, sem 's' final, sem 'es' final
@@ -289,8 +320,12 @@ def busca_universal(records, query):
         variacoes.add(q[:-2])     # veiculos → veiculo
 
     def campo_match(valor):
-        v = str(valor).lower()
+        v = sem_acento(valor)
         return any(var in v for var in variacoes)
+
+    def item_match_exato(valor):
+        v = sem_acento(valor)
+        return any(var == v for var in variacoes)
 
     matches = [r for r in records if any(campo_match(r.get(c,'')) for c in campos)]
 
@@ -301,14 +336,10 @@ def busca_universal(records, query):
             "Digite /ajuda para ver todos os comandos."
         )
 
-    total = len(matches)
-
     # Registros onde a busca bateu no campo ITEM (igual ao filtro do dashboard)
-    matches_item = [r for r in matches if campo_match(r.get('item',''))]
+    matches_item_exato = [r for r in matches if item_match_exato(r.get('item',''))]
+    matches_item = matches_item_exato or [r for r in matches if campo_match(r.get('item',''))]
     total_item = len(matches_item)
-
-    # Descobre em quais campos houve match para exibir contexto
-    campos_encontrados = [c for c in campos if any(campo_match(r.get(c,'')) for r in matches)]
 
     MES_NOME = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril','05':'Maio',
                 '06':'Junho','07':'Julho','08':'Agosto','09':'Setembro','10':'Outubro',
@@ -331,6 +362,8 @@ def busca_universal(records, query):
         f"📊 *{total_base}* ocorrência(s) encontrada(s)",
         f"📅 Período: {datas[0][8:10]}/{datas[0][5:7]} — {datas[-1][8:10]}/{datas[-1][5:7]}",
     ]
+
+    linhas[1] = f"📊 Total: *{total_base}* ocorrência(s)"
 
     if tipos:
         linhas += ["", "*🔴 Tipificação:*"]
@@ -384,6 +417,7 @@ AJUDA = (
 def processar(text, chat_id, records):
     t  = text.strip()
     tl = t.lower()
+    tl_norm = sem_acento(t)
 
     if tl in ['/start','/ajuda','/help','ajuda','help']:
         return send_message(chat_id, AJUDA)
@@ -411,16 +445,18 @@ def processar(text, chat_id, records):
     # Detecta automaticamente se é bairro, tipo ou turno conhecido
     bairros_lista = sorted(set(r['bairro'] for r in records if r['bairro']))
     for b in bairros_lista:
-        if tl == b.lower() or tl in b.lower().split() or b.lower() == tl:
+        b_norm = sem_acento(b)
+        if tl_norm == b_norm or tl_norm in b_norm.split() or b_norm == tl_norm:
             return send_message(chat_id, consultar_bairro(records, t))
 
     tipos_lista = sorted(set(r['tipo'] for r in records if r['tipo']))
     for tp in tipos_lista:
-        if tl == tp.lower() or tl in tp.lower():
+        tp_norm = sem_acento(tp)
+        if tl_norm == tp_norm or tl_norm in tp_norm:
             return send_message(chat_id, consultar_tipo(records, t))
 
     turno_palavras = ['madrugada','manha','manhã','tarde','noite']
-    if tl in turno_palavras:
+    if tl_norm in turno_palavras:
         return send_message(chat_id, consultar_turno(records, t))
 
     # Busca universal em todos os campos
