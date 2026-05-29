@@ -303,6 +303,10 @@ def busca_universal(records, query):
 
     total = len(matches)
 
+    # Registros onde a busca bateu no campo ITEM (igual ao filtro do dashboard)
+    matches_item = [r for r in matches if campo_match(r.get('item',''))]
+    total_item = len(matches_item)
+
     # Descobre em quais campos houve match para exibir contexto
     campos_encontrados = [c for c in campos if any(campo_match(r.get(c,'')) for r in matches)]
 
@@ -314,13 +318,15 @@ def busca_universal(records, query):
     marcas  = Counter(r['marca']   for r in matches if r['marca']).most_common(3)
     datas   = sorted(set(r['data'] for r in matches))
 
-    label_campos = {'bairro':'bairro','tipo':'tipo de crime','item':'item','marca':'marca/modelo','turno':'turno','endereco':'logradouro','dia':'dia da semana'}
-    encontrado_em = ', '.join(label_campos.get(c,c) for c in campos_encontrados)
+    # Linha de resumo: destaca total do item (igual ao dashboard) vs total geral
+    if total_item > 0 and total_item < total:
+        resumo = f"*{total_item}* como item principal  |  *{total}* total (incl. descrições)"
+    else:
+        resumo = f"*{total}* ocorrência(s) encontrada(s)"
 
     linhas = [
         f"🔍 *BUSCA: \"{query.upper()}\"*",
-        f"📊 *{total}* ocorrência(s) encontrada(s)",
-        f"🗂 Encontrado em: _{encontrado_em}_",
+        f"📊 {resumo}",
         f"📅 Período: {datas[0][8:10]}/{datas[0][5:7]} — {datas[-1][8:10]}/{datas[-1][5:7]}",
     ]
 
