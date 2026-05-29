@@ -42,9 +42,9 @@ warnings.filterwarnings('ignore')
 import os as _os
 
 # Lê das variáveis de ambiente (GitHub Actions) ou usa os valores locais como fallback
-BOT_TOKEN       = _os.environ.get('BOT_TOKEN',       "8971067969:AAF73XtvvHyhkb_KX0dC3Tny6DQ6DtRdjjM")
-CHAT_ID         = _os.environ.get('CHAT_ID',         "1931364088")
-GOOGLE_DRIVE_ID = _os.environ.get('GOOGLE_DRIVE_ID', "1w_4WgORfWrxonI-tL6uKOkoCZJQ9K5VN")
+BOT_TOKEN       = _os.environ.get('BOT_TOKEN',       "8971067969:AAF73XtvvHyhkb_KX0dC3Tny6DQ6DtRdjjM").strip()
+CHAT_ID         = _os.environ.get('CHAT_ID',         "1931364088").strip()
+GOOGLE_DRIVE_ID = _os.environ.get('GOOGLE_DRIVE_ID', "1w_4WgORfWrxonI-tL6uKOkoCZJQ9K5VN").strip()
 
 ARQUIVO_EXCEL = "secretario.xlsx"   # Usado apenas se GOOGLE_DRIVE_ID estiver vazio
 
