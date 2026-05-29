@@ -279,11 +279,20 @@ def consultar_resumo(records):
 def busca_universal(records, query):
     """Busca em todos os campos: bairro, tipo, item, marca, turno, logradouro, dia."""
     q = query.strip().lower()
-    campos = ['bairro','tipo','item','marca','turno','endereco','dia']
+    campos = ['bairro','tipo','item','marca','turno','endereco','dia','bo']
 
-    matches = [r for r in records if any(
-        q in str(r.get(c,'')).lower() for c in campos
-    )]
+    # Variações da busca: original, sem 's' final, sem 'es' final
+    variacoes = {q}
+    if q.endswith('s') and len(q) > 3:
+        variacoes.add(q[:-1])     # bicicletas → bicicleta
+    if q.endswith('es') and len(q) > 4:
+        variacoes.add(q[:-2])     # veiculos → veiculo
+
+    def campo_match(valor):
+        v = str(valor).lower()
+        return any(var in v for var in variacoes)
+
+    matches = [r for r in records if any(campo_match(r.get(c,'')) for c in campos)]
 
     if not matches:
         return (
@@ -295,7 +304,7 @@ def busca_universal(records, query):
     total = len(matches)
 
     # Descobre em quais campos houve match para exibir contexto
-    campos_encontrados = [c for c in campos if any(q in str(r.get(c,'')).lower() for r in matches)]
+    campos_encontrados = [c for c in campos if any(campo_match(r.get(c,'')) for r in matches)]
 
     tipos   = Counter(r['tipo']    for r in matches if r['tipo']).most_common(5)
     bairros = Counter(r['bairro']  for r in matches if r['bairro']).most_common(5)
@@ -397,31 +406,60 @@ def processar(text, chat_id, records):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    print("Bot GMBC iniciado...")
+    import time
 
-    updates = get_updates()
-    if not updates:
-        print("Nenhuma mensagem pendente.")
-        sys.exit(0)
-
-    print(f"{len(updates)} mensagem(ns) pendente(s). Carregando dados...")
+    print("Bot GMBC iniciado — modo continuo...")
+    print("Carregando dados iniciais...")
     records = carregar_dados()
     print(f"  {len(records)} registros carregados.")
 
-    last_id = None
-    for upd in updates:
-        last_id = upd['update_id']
-        msg  = upd.get('message') or upd.get('edited_message')
-        if not msg: continue
-        text = msg.get('text','').strip()
-        if not text: continue
-        cid  = str(msg['chat']['id'])
-        nome = msg['chat'].get('first_name') or msg['chat'].get('title') or cid
-        print(f"  [{nome}] '{text}'")
-        processar(text, cid, records)
+    # Recarrega dados a cada 30 minutos
+    ultima_carga = time.time()
+    INTERVALO_RECARGA = 30 * 60  # 30 minutos
 
-    # Marca mensagens como lidas
-    if last_id:
-        get_updates(offset=last_id + 1)
+    offset = None
+    print("Aguardando mensagens...\n")
 
-    print("Concluido.")
+    while True:
+        try:
+            # Recarrega dados periodicamente
+            if time.time() - ultima_carga > INTERVALO_RECARGA:
+                print("Recarregando dados da planilha...")
+                records = carregar_dados()
+                print(f"  {len(records)} registros.")
+                ultima_carga = time.time()
+
+            # Long polling — espera até 30s por novas mensagens
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?timeout=30"
+            if offset:
+                url += f"&offset={offset}"
+
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=40) as resp:
+                    updates = json.loads(resp.read().decode()).get('result', [])
+            except Exception as e:
+                print(f"Erro polling: {e}")
+                time.sleep(5)
+                continue
+
+            for upd in updates:
+                offset = upd['update_id'] + 1
+                msg = upd.get('message') or upd.get('edited_message')
+                if not msg:
+                    continue
+                text = msg.get('text', '').strip()
+                if not text:
+                    continue
+                cid  = str(msg['chat']['id'])
+                nome = msg['chat'].get('first_name') or msg['chat'].get('title') or cid
+                now  = datetime.now(BRT).strftime('%H:%M:%S')
+                print(f"[{now}] [{nome}] '{text}'")
+                processar(text, cid, records)
+
+        except KeyboardInterrupt:
+            print("\nBot encerrado.")
+            break
+        except Exception as e:
+            print(f"Erro inesperado: {e}")
+            time.sleep(5)
