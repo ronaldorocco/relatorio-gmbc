@@ -314,11 +314,15 @@ def busca_universal(records, query):
     bairros = Counter(r['bairro']  for r in matches if r['bairro']).most_common(5)
     turnos  = Counter(r['turno']   for r in matches if r['turno']).most_common()
     ruas    = Counter(r['endereco'] for r in matches if r['endereco'] and r['endereco'] != 'nan').most_common(5)
-    itens   = Counter(r['item']    for r in matches if r['item']).most_common(5)
-    marcas  = Counter(r['marca']   for r in matches if r['marca']).most_common(3)
+    dias    = Counter(r['dia']     for r in matches if r['dia']).most_common()
+    meses   = Counter(r['data'][5:7] for r in matches if r.get('data') and len(r['data'])>=7).most_common()
     datas   = sorted(set(r['data'] for r in matches))
 
-    # Linha de resumo: destaca total do item (igual ao dashboard) vs total geral
+    MES_NOME = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril','05':'Maio',
+                '06':'Junho','07':'Julho','08':'Agosto','09':'Setembro','10':'Outubro',
+                '11':'Novembro','12':'Dezembro'}
+
+    # Linha de resumo
     if total_item > 0 and total_item < total:
         resumo = f"*{total_item}* como item principal  |  *{total}* total (incl. descrições)"
     else:
@@ -331,7 +335,7 @@ def busca_universal(records, query):
     ]
 
     if tipos:
-        linhas += ["", "*🔴 Tipos de crime:*"]
+        linhas += ["", "*🔴 Tipificação:*"]
         linhas += [f"  {i+1}. {t}: *{n}* ({pct(n,total)})" for i,(t,n) in enumerate(tipos)]
 
     if bairros:
@@ -339,20 +343,20 @@ def busca_universal(records, query):
         linhas += [f"  {i+1}. {b}: *{n}* ({pct(n,total)})" for i,(b,n) in enumerate(bairros)]
 
     if turnos:
-        linhas += ["", "*⏰ Por turno:*"]
+        linhas += ["", "*⏰ Turno:*"]
         linhas += [f"  • {t}: *{n}* ({pct(n,total)})" for t,n in turnos]
 
+    if dias:
+        linhas += ["", "*📆 Dia da semana:*"]
+        linhas += [f"  • {d}: *{n}* ({pct(n,total)})" for d,n in dias]
+
+    if meses:
+        linhas += ["", "*🗓 Mês:*"]
+        linhas += [f"  • {MES_NOME.get(m,m)}: *{n}*" for m,n in meses]
+
     if ruas:
-        linhas += ["", "*🛣️ Logradouros:*"]
+        linhas += ["", "*🛣️ Ruas:*"]
         linhas += [f"  {i+1}. {r}: *{n}* oc." for i,(r,n) in enumerate(ruas)]
-
-    if itens:
-        linhas += ["", "*📦 Itens envolvidos:*"]
-        linhas += [f"  • {it}: *{n}*" for it,n in itens]
-
-    if marcas:
-        linhas += ["", "*🚗 Marcas/modelos:*"]
-        linhas += [f"  • {m}: *{n}*" for m,n in marcas]
 
     return '\n'.join(linhas)
 
