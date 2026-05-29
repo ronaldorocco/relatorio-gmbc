@@ -27,7 +27,10 @@ import sys
 import json
 import math
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Fuso horário de Brasília (UTC-3)
+BRT = timezone(timedelta(hours=-3))
 from collections import Counter
 import urllib.request
 import urllib.parse
@@ -42,6 +45,7 @@ warnings.filterwarnings('ignore')
 import os as _os
 
 # Lê das variáveis de ambiente (GitHub Actions) ou usa os valores locais como fallback
+# .strip() remove qualquer espaço ou quebra de linha acidental
 BOT_TOKEN       = _os.environ.get('BOT_TOKEN',       "8971067969:AAF73XtvvHyhkb_KX0dC3Tny6DQ6DtRdjjM").strip()
 CHAT_ID         = _os.environ.get('CHAT_ID',         "1931364088").strip()
 GOOGLE_DRIVE_ID = _os.environ.get('GOOGLE_DRIVE_ID', "1w_4WgORfWrxonI-tL6uKOkoCZJQ9K5VN").strip()
@@ -220,7 +224,7 @@ def pct(n, total):
 
 
 def turno_atual():
-    h = datetime.now().hour
+    h = datetime.now(BRT).hour
     if  6 <= h <= 11: return 'Manhã'
     if 12 <= h <= 17: return 'Tarde'
     if 18 <= h <= 23: return 'Noite'
@@ -233,7 +237,7 @@ def proxima_turno(t):
 
 
 def gerar_analise_diaria(records):
-    now       = datetime.now()
+    now       = datetime.now(BRT)
     dia_num   = now.weekday()  # 0=Segunda...6=Domingo
     DIAS      = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo']
     PLURAL    = ['Segundas','Terças','Quartas','Quintas','Sextas','Sábados','Domingos']
@@ -314,7 +318,7 @@ def gerar_analise_diaria(records):
 
 
 def gerar_previsao(records):
-    now      = datetime.now()
+    now      = datetime.now(BRT)
     dia_num  = now.weekday()
     DIAS     = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo']
     PLURAL   = ['Segundas','Terças','Quartas','Quintas','Sextas','Sábados','Domingos']
